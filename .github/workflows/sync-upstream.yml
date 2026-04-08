@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Sync with upstream
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.FORK_SYNC_TOKEN }}
         run: |
           gh api repos/${{ github.repository }}/merge-upstream \
             --method POST \
