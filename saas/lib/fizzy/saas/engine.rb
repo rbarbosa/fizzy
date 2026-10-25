@@ -6,6 +6,7 @@ require_relative "gvl_instrumentation"
 require_relative "cell"
 require_relative "unprocessable_attachments"
 require_relative "sentry_sql_redaction"
+require_relative "job_memory"
 require_relative "../../rails_ext/active_record_tasks_database_tasks.rb"
 
 module Fizzy
@@ -46,6 +47,11 @@ module Fizzy
         app.config.middleware.insert_before ActionDispatch::RemoteIp, TrackTrueClientIp
       end
 
+      initializer "fizzy_saas.reviewer_sign_in" do |app|
+        app.config.x.reviewer_sign_in.email_address = ENV["FIZZY_REVIEWER_SIGN_IN_EMAIL"]
+        app.config.x.reviewer_sign_in.code_digest = ENV["FIZZY_REVIEWER_SIGN_IN_CODE_DIGEST"]
+      end
+
       initializer "fizzy_saas.gvl_instrumentation" do |app|
         app.config.middleware.insert_before(Rack::Runtime, GvlInstrumentation)
       end
@@ -79,6 +85,10 @@ module Fizzy
           Process.warmup
           Yabeda::Prometheus::Exporter.start_metrics_server!
         end
+      end
+
+      initializer "fizzy_saas.logging.job_memory" do
+        ActiveSupport.on_load(:active_job) { include JobMemory }
       end
 
       initializer "fizzy_saas.logging.session" do |app|
@@ -209,6 +219,7 @@ module Fizzy
         ::Identity.include Authorization::Identity, Identity::Devices
         ::Session.include Session::Devices
         ::Signup.prepend Signup
+        Sessions::MagicLinksController.prepend Sessions::ReviewerSignIn
         ApplicationController.include Authorization::Controller
         CardsController.include(Card::StorageLimited::Creation)
         Cards::CommentsController.include(Card::StorageLimited::Commenting)
