@@ -35,9 +35,32 @@ class Oauth::ClientMetadata::UrlTest < ActiveSupport::TestCase
   test "recognizes only the exact allowlisted hosts" do
     assert Oauth::ClientMetadata.recognized?("https://claude.ai/client.json")
     assert Oauth::ClientMetadata.recognized?("https://chatgpt.com/client.json")
+    assert Oauth::ClientMetadata.recognized?("https://www.perplexity.ai/.well-known/mcp-client.json")
+    assert_not Oauth::ClientMetadata.recognized?("https://perplexity.ai/.well-known/mcp-client.json")
+    assert_not Oauth::ClientMetadata.recognized?("https://evil.www.perplexity.ai/.well-known/mcp-client.json")
+    assert_not Oauth::ClientMetadata.recognized?("https://www.perplexity.ai.example.com/.well-known/mcp-client.json")
     assert_not Oauth::ClientMetadata.recognized?("https://evil.claude.ai/client.json")
     assert_not Oauth::ClientMetadata.recognized?("https://claude.ai.example.com/client.json")
     assert_not Oauth::ClientMetadata.recognized?("https://CLAUDE.AI/client.json")
     assert_not Oauth::ClientMetadata.recognized?("https://tools.example.com/client.json")
+  end
+
+  test "budgets pool at the registrable domain, canonically" do
+    assert_equal "example.com", Oauth::ClientMetadata.registrable_domain("a.b.tools.example.com")
+    assert_equal "example.com", Oauth::ClientMetadata.registrable_domain("Tools.EXAMPLE.com")
+    assert_equal "example.co.uk", Oauth::ClientMetadata.registrable_domain("tools.example.co.uk")
+    assert_equal "evil-claude.ai", Oauth::ClientMetadata.registrable_domain("evil-claude.ai")
+  end
+
+  test "private suffixes are registrable domains of their own" do
+    assert_equal "alice.github.io", Oauth::ClientMetadata.registrable_domain("alice.github.io")
+    assert_not_equal Oauth::ClientMetadata.registrable_domain("alice.github.io"), Oauth::ClientMetadata.registrable_domain("bob.github.io")
+  end
+
+  test "an IP literal or a single label counts as itself, in one spelling" do
+    assert_equal "93.184.216.34", Oauth::ClientMetadata.registrable_domain("93.184.216.34")
+    assert_equal "::1", Oauth::ClientMetadata.registrable_domain("[::1]")
+    assert_equal "::1", Oauth::ClientMetadata.registrable_domain("[0:0:0:0:0:0:0:1]")
+    assert_equal "localhost", Oauth::ClientMetadata.registrable_domain("LOCALHOST")
   end
 end
